@@ -1,0 +1,33 @@
+name: release
+
+# Publishes a prebuilt tarball on every v* tag. Installing from the tarball
+# avoids depending on a build step at install time, which pnpm blocks by
+# default for dependencies.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Check tag matches package.json version
+        run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+      - run: pnpm pack
+      # Stable asset name so /releases/latest/download/1pass2passbolt.tgz always works.
+      - run: mv 1pass2passbolt-*.tgz 1pass2passbolt.tgz
+      - run: gh release create "$GITHUB_REF_NAME" 1pass2passbolt.tgz --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
