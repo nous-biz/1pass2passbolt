@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { describeAccounts } from './accounts.ts';
 import type { Deps } from './ports.ts';
 
 const DEFAULT_PASSBOLT_CONFIG = join(homedir(), '.config', 'go-passbolt-cli', 'go-passbolt-cli.toml');
@@ -35,7 +36,7 @@ export async function runDoctor(
   await attempt('op account', async () => {
     const accounts = await onePassword.listAccounts();
     if (account && !accounts.some((a) => a.url === account || a.email === account)) {
-      throw new Error(`"${account}" is not signed in (op account add / op signin)`);
+      throw new Error(`"${account}" is not signed in (op account add / op signin)\n${describeAccounts(accounts)}`);
     }
     return `${accounts.length} account(s) available`;
   });
