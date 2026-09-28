@@ -50,8 +50,10 @@ export function createStateStore(root: string): StatePort {
     },
 
     async readVaultItems(vaultName) {
-      const body = await readOptional(vaultFile(vaultName));
+      const file = vaultFile(vaultName);
+      const body = await readOptional(file);
       if (body === null) throw new Error(`no export found for vault "${vaultName}" in ${root} (run \`export\` first)`);
+      await chmod(file, FILE_MODE);
       return body.split('\n').filter(Boolean).map((line) => JSON.parse(line) as OpItem);
     },
 

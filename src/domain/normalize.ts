@@ -28,6 +28,9 @@ const FIELD_RULES: FieldRule[] = [
   { match: (f) => f.purpose === 'NOTES', kind: 'text', label: 'notes', forceLabel: true },
   { match: (f) => f.type === 'STRING' && !f.purpose && f.label !== 'notesPlain', kind: 'text', label: 'field' },
   { match: (f) => f.type === 'URL', kind: 'uri', label: 'url' },
+  // Only the first OTP becomes the native TOTP (it is removed before these
+  // rules run); any further seed is kept as an encrypted custom field.
+  { match: (f) => f.type === 'OTP', kind: 'password', label: 'one-time password' },
   { match: (f) => OTHER_TEXT_TYPES.has(f.type ?? ''), kind: 'text' },
 ];
 
@@ -42,10 +45,10 @@ function labelFor(rule: FieldRule, f: OpField): string {
   return f.label ?? rule.label ?? f.type ?? 'field';
 }
 
-// Unknown or future field types are kept as text rather than dropped. OTP
-// becomes the native TOTP, and notesPlain duplicates the NOTES field.
+// Unknown or future field types are kept as text rather than dropped.
+// notesPlain duplicates the NOTES field.
 const FALLBACK_RULE: FieldRule = { match: () => true, kind: 'text' };
-const isHandledElsewhere = (f: OpField) => f.type === 'OTP' || f.label === 'notesPlain';
+const isHandledElsewhere = (f: OpField) => f.label === 'notesPlain';
 
 function extractFields(rawFields: OpField[]): Field[] {
   const withValue = rawFields.filter(hasValue);
@@ -84,7 +87,7 @@ export function normalizeItem(item: OpItem): NormalizedItem {
   const otp = rawFields.find((f) => f.type === 'OTP' && hasValue(f));
   const totp = parseTotp(otp ? asString(otp.value) : null);
   const uri = primaryUri(item.urls);
-  const fields = extractFields(rawFields);
+  const fields = extractFields(rawFields.filter((f) => f !== otp));
 
   return {
     vault: item.vault?.name ?? null,

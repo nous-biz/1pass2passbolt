@@ -62,7 +62,8 @@ Global options: `-s/--state-dir <dir>` (default `./.1pass2passbolt`) and `-a/--a
 |---|---|
 | first `USERNAME` | native username |
 | first `PASSWORD` field; if there is none, the first other secret (`CONCEALED`, `SSHKEY`, `CREDIT_CARD_NUMBER`) | native password |
-| `OTP` (base32 seed or `otpauth://`) | native TOTP |
+| first `OTP` (base32 seed or `otpauth://`) | native TOTP |
+| further `OTP` fields | `password` custom field (seed encrypted) |
 | remaining secrets (`CONCEALED`, `SSHKEY`, `CREDIT_CARD_NUMBER`) | `password` custom field (value encrypted) |
 | notes | `text` custom field labelled `notes` |
 | extra `URL` fields | `uri` custom field |

@@ -62,15 +62,25 @@ describe('normalizeItem', () => {
     assert.equal(normalizeItem(item({ fields: [] })).has_content, false);
   });
 
-  it('keeps unknown field types as text, but not OTP or the notesPlain duplicate', () => {
+  it('keeps unknown field types as text, but not the notesPlain duplicate', () => {
     const normalized = normalizeItem(item({
       fields: [
         { type: 'FUTURE_TYPE', label: 'new thing', value: 'x' },
-        { type: 'OTP', label: 'one-time password', value: 'ABCD' },
         { type: 'STRING', label: 'notesPlain', value: 'dup' },
       ],
     }));
     assert.deepEqual(normalized.fields, [{ label: 'new thing', value: 'x', kind: 'text' }]);
+  });
+
+  it('uses the first OTP as native TOTP and keeps further OTPs as secret fields', () => {
+    const normalized = normalizeItem(item({
+      fields: [
+        { type: 'OTP', label: 'main', value: 'AAAA' },
+        { type: 'OTP', label: 'backup', value: 'BBBB' },
+      ],
+    }));
+    assert.equal(normalized.totp?.secret_key, 'AAAA');
+    assert.deepEqual(normalized.fields, [{ label: 'backup', value: 'BBBB', kind: 'password' }]);
   });
 
   it('stringifies structured values', () => {
