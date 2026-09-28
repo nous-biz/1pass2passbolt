@@ -62,6 +62,17 @@ describe('normalizeItem', () => {
     assert.equal(normalizeItem(item({ fields: [] })).has_content, false);
   });
 
+  it('keeps unknown field types as text, but not OTP or the notesPlain duplicate', () => {
+    const normalized = normalizeItem(item({
+      fields: [
+        { type: 'FUTURE_TYPE', label: 'new thing', value: 'x' },
+        { type: 'OTP', label: 'one-time password', value: 'ABCD' },
+        { type: 'STRING', label: 'notesPlain', value: 'dup' },
+      ],
+    }));
+    assert.deepEqual(normalized.fields, [{ label: 'new thing', value: 'x', kind: 'text' }]);
+  });
+
   it('stringifies structured values', () => {
     const normalized = normalizeItem(item({ fields: [{ type: 'ADDRESS', label: 'home', value: { city: 'X' } }] }));
     assert.equal(normalized.fields[0]?.value, '{"city":"X"}');

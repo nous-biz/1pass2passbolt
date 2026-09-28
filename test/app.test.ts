@@ -96,9 +96,27 @@ describe('compareResource', () => {
     assert.ok(plan);
     const resource = {
       name: 'A', password: 'p',
-      metadata: { custom_fields: [{}, { metadata_value: 'changed' }] },
+      metadata: { custom_fields: [{ type: 'password', metadata_key: 'API key' }, { type: 'text', metadata_key: 'note', metadata_value: 'changed' }] },
       secret: { custom_fields: [{ secret_value: 'k' }, {}] },
     };
-    assert.deepEqual(compareResource(plan, resource), ['note']);
+    assert.deepEqual(compareResource(plan, resource), { mismatches: ['note'], relabeled: [] });
+  });
+
+  it('reports renamed labels, wrong types and changed TOTP parameters', () => {
+    const plan = planResource({
+      vault: 'V', op_id: 'a', title: 'A', category: 'LOGIN', uri: null, has_content: true,
+      totp: { secret_key: 'S', algorithm: 'SHA1', digits: 6, period: 30 },
+      fields: [{ label: 'note', value: 'n', kind: 'text' }],
+    });
+    assert.ok(plan);
+    const resource = {
+      name: 'A',
+      metadata: { custom_fields: [{ type: 'uri', metadata_key: 'renamed', metadata_value: 'n' }] },
+      secret: { totp: { secret_key: 'S', algorithm: 'SHA1', digits: 8, period: 30 } },
+    };
+    assert.deepEqual(compareResource(plan, resource), {
+      mismatches: ['totp digits', 'note (type uri, expected text)'],
+      relabeled: ['"note" stored as "renamed"'],
+    });
   });
 });

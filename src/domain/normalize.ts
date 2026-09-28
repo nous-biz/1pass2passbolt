@@ -42,11 +42,17 @@ function labelFor(rule: FieldRule, f: OpField): string {
   return f.label ?? rule.label ?? f.type ?? 'field';
 }
 
+// Unknown or future field types are kept as text rather than dropped. OTP
+// becomes the native TOTP, and notesPlain duplicates the NOTES field.
+const FALLBACK_RULE: FieldRule = { match: () => true, kind: 'text' };
+const isHandledElsewhere = (f: OpField) => f.type === 'OTP' || f.label === 'notesPlain';
+
 function extractFields(rawFields: OpField[]): Field[] {
   const withValue = rawFields.filter(hasValue);
-  return FIELD_RULES.flatMap((rule) =>
-    withValue.filter(rule.match).map((f) => ({ label: labelFor(rule, f), value: asString(f.value), kind: rule.kind })),
-  );
+  const toField = (rule: FieldRule) => (f: OpField): Field => ({ label: labelFor(rule, f), value: asString(f.value), kind: rule.kind });
+  const matched = FIELD_RULES.flatMap((rule) => withValue.filter(rule.match).map(toField(rule)));
+  const unmatched = withValue.filter((f) => !isHandledElsewhere(f) && !FIELD_RULES.some((rule) => rule.match(f)));
+  return [...matched, ...unmatched.map(toField(FALLBACK_RULE))];
 }
 
 const cleanBase32 = (s: string) => s.replace(/[ -]/g, '').toUpperCase();

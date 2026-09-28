@@ -60,20 +60,22 @@ Global options: `-s/--state-dir <dir>` (default `./.1pass2passbolt`) and `-a/--a
 
 | 1Password field | Passbolt |
 |---|---|
-| first `USERNAME` / `PASSWORD` | native username / password |
+| first `USERNAME` | native username |
+| first `PASSWORD` field; if there is none, the first other secret (`CONCEALED`, `SSHKEY`, `CREDIT_CARD_NUMBER`) | native password |
 | `OTP` (base32 seed or `otpauth://`) | native TOTP |
-| other `CONCEALED`, `SSHKEY`, `CREDIT_CARD_NUMBER` | `password` custom field (value encrypted) |
+| remaining secrets (`CONCEALED`, `SSHKEY`, `CREDIT_CARD_NUMBER`) | `password` custom field (value encrypted) |
 | notes | `text` custom field labelled `notes` |
 | extra `URL` fields | `uri` custom field |
 | string, address, email, phone, date, menu... | `text` custom field |
+| any other or future field type | `text` custom field (never dropped) |
 
-Items without a password or TOTP become `v5-custom-fields` resources. With `v5-totp-standalone`, which has no username slot, the username is kept as a custom field.
+An item with no secret at all and no TOTP becomes a `v5-custom-fields` resource. A lone API key or SSH key therefore lands in the native password slot, where it can be copied like any password. With `v5-totp-standalone`, which has no username slot, the username is kept as a custom field.
 
 ## Security notes
 
 - The state dir holds **plaintext secrets**. Directories are `0700` and files `0600`. Run `clean` when you're done.
 - go-passbolt-cli only accepts secrets as command-line arguments, so they're briefly visible to other processes of the same machine (for example in `ps`). Run migrations on a machine you trust. The tool never uses a shell, and it never prints an argv or a secret value in logs or errors.
-- `verify` reports mismatching field labels, never values.
+- `verify` reports field labels, never values. `MISMATCH` (a value or type differs) fails the command. `LABELS` (the same value stored under another label, for example after a manual rename) is only reported.
 
 ## Development
 

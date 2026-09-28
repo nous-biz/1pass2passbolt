@@ -151,8 +151,8 @@ export function buildProgram(): Command {
     .option('--all', 'check every migrated item')
     .action(action(async (deps, opts) => {
       const size = opts.all ? Infinity : (opts.sample ?? 15);
-      const { checked, failures } = await verifyMigration(deps, { vault: opts.vault, size });
-      log.info(`\nchecked ${checked}, mismatches ${failures}`);
+      const { checked, failures, relabeled } = await verifyMigration(deps, { vault: opts.vault, size });
+      log.info(`\nchecked ${checked}, mismatches ${failures}, label-only differences ${relabeled}`);
       if (failures > 0) process.exitCode = 1;
     }));
 

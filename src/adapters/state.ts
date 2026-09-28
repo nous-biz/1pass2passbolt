@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { appendFile, chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { StatePort } from '../app/ports.ts';
@@ -8,8 +9,11 @@ import type { Ledger, OpItem } from '../domain/types.ts';
 const DIR_MODE = 0o700;
 const FILE_MODE = 0o600;
 
-export function slugify(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'vault';
+// Readable slug plus a hash of the exact name, so vaults like "A/B" and
+// "A-B" never share (and overwrite) the same export file.
+export function vaultKey(name: string): string {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'vault';
+  return `${slug}-${createHash('sha256').update(name).digest('hex').slice(0, 8)}`;
 }
 
 async function ensureDir(path: string) {
@@ -29,7 +33,7 @@ async function readOptional(path: string): Promise<string | null> {
 const tsvCell = (value: string) => value.replace(/[\t\n]/g, ' ');
 
 export function createStateStore(root: string): StatePort {
-  const vaultDir = (vaultName: string) => join(root, slugify(vaultName));
+  const vaultDir = (vaultName: string) => join(root, vaultKey(vaultName));
   const vaultFile = (vaultName: string) => join(vaultDir(vaultName), 'items.jsonl');
   const ledgerFile = join(root, 'ledger.tsv');
 
@@ -64,6 +68,7 @@ export function createStateStore(root: string): StatePort {
       await ensureDir(root);
       const row = [opId, vault, name, resourceId, new Date().toISOString(), status].map(tsvCell).join('\t');
       await appendFile(ledgerFile, `${row}\n`, { mode: FILE_MODE });
+      await chmod(ledgerFile, FILE_MODE);
     },
 
     clean: () => rm(root, { recursive: true, force: true }),
