@@ -13,11 +13,20 @@ describe('vaultKey', () => {
 });
 
 describe('createStateStore', () => {
+  it('keeps the same vault name apart across accounts', async () => {
+    const root = await mkdtemp(join(tmpdir(), '1p2pb-'));
+    await createStateStore(root, 'a.1password.com').writeVaultItems('V', [{ id: 'a', title: 'A', category: 'LOGIN' }]);
+    await createStateStore(root, 'b.1password.com').writeVaultItems('V', [{ id: 'b', title: 'B', category: 'LOGIN' }]);
+    assert.deepEqual((await createStateStore(root, 'a.1password.com').readVaultItems('V')).map((i) => i.id), ['a']);
+    await assert.rejects(createStateStore(root).readVaultItems('V'), /same --account/);
+    await createStateStore(root).clean();
+  });
+
   it('forces 0600 on existing exports and ledgers', async () => {
     const root = await mkdtemp(join(tmpdir(), '1p2pb-'));
     const state = createStateStore(root);
     await state.writeVaultItems('V', [{ id: 'a', title: 'A', category: 'LOGIN' }]);
-    const exportFile = join(root, vaultKey('V'), 'items.jsonl');
+    const exportFile = join(root, 'default-account', vaultKey('V'), 'items.jsonl');
     await chmod(exportFile, 0o644);
     assert.deepEqual((await state.readVaultItems('V')).map((i) => i.id), ['a']);
     assert.equal((await stat(exportFile)).mode & 0o777, 0o600);

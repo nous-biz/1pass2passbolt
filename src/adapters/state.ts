@@ -9,8 +9,8 @@ import type { Ledger, OpItem } from '../domain/types.ts';
 const DIR_MODE = 0o700;
 const FILE_MODE = 0o600;
 
-// Readable slug plus a hash of the exact name, so vaults like "A/B" and
-// "A-B" never share (and overwrite) the same export file.
+// Readable slug plus a hash of the exact name, so names like "A/B" and
+// "A-B" never share (and overwrite) the same directory.
 export function vaultKey(name: string): string {
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'vault';
   return `${slug}-${createHash('sha256').update(name).digest('hex').slice(0, 8)}`;
@@ -32,8 +32,12 @@ async function readOptional(path: string): Promise<string | null> {
 
 const tsvCell = (value: string) => value.replace(/[\t\n]/g, ' ');
 
-export function createStateStore(root: string): StatePort {
-  const vaultDir = (vaultName: string) => join(root, vaultKey(vaultName));
+// Exports are namespaced per 1Password account, so the same vault name in
+// two accounts can't overwrite each other. The ledger stays shared: op item
+// ids are unique across accounts.
+export function createStateStore(root: string, account?: string): StatePort {
+  const accountDir = join(root, account ? vaultKey(account) : 'default-account');
+  const vaultDir = (vaultName: string) => join(accountDir, vaultKey(vaultName));
   const vaultFile = (vaultName: string) => join(vaultDir(vaultName), 'items.jsonl');
   const ledgerFile = join(root, 'ledger.tsv');
 
@@ -42,6 +46,7 @@ export function createStateStore(root: string): StatePort {
 
     async writeVaultItems(vaultName, items) {
       await ensureDir(root);
+      await ensureDir(accountDir);
       await ensureDir(vaultDir(vaultName));
       const file = vaultFile(vaultName);
       await writeFile(file, items.map((item) => `${JSON.stringify(item)}\n`).join(''), { mode: FILE_MODE });
@@ -52,7 +57,10 @@ export function createStateStore(root: string): StatePort {
     async readVaultItems(vaultName) {
       const file = vaultFile(vaultName);
       const body = await readOptional(file);
-      if (body === null) throw new Error(`no export found for vault "${vaultName}" in ${root} (run \`export\` first)`);
+      if (body === null) {
+        const forAccount = account ? `account "${account}"` : 'the default account (no --account)';
+        throw new Error(`no export of vault "${vaultName}" for ${forAccount} in ${root}; run \`export\` first, with the same --account`);
+      }
       await chmod(file, FILE_MODE);
       return body.split('\n').filter(Boolean).map((line) => JSON.parse(line) as OpItem);
     },

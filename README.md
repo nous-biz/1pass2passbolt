@@ -31,13 +31,13 @@ pnpm add -g https://github.com/nous-biz/1pass2passbolt/releases/latest/download/
 1pass2passbolt -a example.1password.com export -v "Employee"
 
 # 2. Dry run: what would be created, what's already there, what needs a human
-1pass2passbolt plan -v "Employee" -f "Employee"
+1pass2passbolt -a example.1password.com plan -v "Employee" -f "Employee"
 
 # 3. Create what's missing (asks for confirmation; -y to skip)
-1pass2passbolt import -v "Employee" -f "Employee"
+1pass2passbolt -a example.1password.com import -v "Employee" -f "Employee"
 
 # 4. Compare every migrated field with the export
-1pass2passbolt verify -v "Employee" --all
+1pass2passbolt -a example.1password.com verify -v "Employee" --all
 
 # 5. Delete the local export and ledger
 1pass2passbolt clean
@@ -45,7 +45,7 @@ pnpm add -g https://github.com/nous-biz/1pass2passbolt/releases/latest/download/
 
 `-f/--folder` defaults to the vault name. Folder names must match exactly. If several folders share the name, or only a case-insensitive match exists, the command stops and asks you to pass `--folder-id`. It never guesses and never creates a look-alike folder.
 
-Global options: `-s/--state-dir <dir>` (default `./.1pass2passbolt`) and `-a/--account <address>`.
+Global options: `-s/--state-dir <dir>` (default `./.1pass2passbolt`) and `-a/--account <address>`. Exports are stored per account, so pass the same `-a` to `export`, `plan`, `import` and `verify`.
 
 ### How `plan`/`import` decide
 

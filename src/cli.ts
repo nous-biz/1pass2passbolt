@@ -68,7 +68,7 @@ function dependencies(opts: GlobalOptions): Deps {
   return {
     onePassword: createOnePassword({ account: opts.account }),
     passbolt: createPassbolt(),
-    state: createStateStore(opts.stateDir),
+    state: createStateStore(opts.stateDir, opts.account),
     log,
   };
 }
