@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.tgz
+
+# Default state dir: plaintext secrets and internal ids. Never commit.
+.1pass2passbolt/
