@@ -124,7 +124,7 @@ export function buildProgram(): Command {
     .option('-v, --vault <name>', 'vault name (exact, repeatable)', collect, [])
     .option('--all', 'export every vault of the account')
     .action(action<GlobalOptions & { vault: string[]; all?: boolean }>(async (deps, opts) => {
-      await exportVaults(deps, { vaults: opts.vault, all: Boolean(opts.all) });
+      await exportVaults(deps, { vaults: opts.vault, all: Boolean(opts.all), account: opts.account });
     }));
 
   withFolderOptions(program.command('plan'))
