@@ -46,7 +46,7 @@ describe('planResource', () => {
 });
 
 describe('toCustomFields', () => {
-  it('pairs metadata and secret by id and keeps secrets off the metadata side', () => {
+  it('pairs metadata and secret by id and sets each value on only one side', () => {
     let n = 0;
     const { metadata, secret } = toCustomFields([extra, { label: 'note', value: 'hi', kind: 'text' }], () => `id${(n += 1)}`);
     assert.deepEqual(metadata, [
@@ -55,7 +55,7 @@ describe('toCustomFields', () => {
     ]);
     assert.deepEqual(secret, [
       { id: 'id1', type: 'password', secret_value: 'd' },
-      { id: 'id2', type: 'text', secret_value: '' },
+      { id: 'id2', type: 'text', secret_value: null },
     ]);
   });
 });
