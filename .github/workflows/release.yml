@@ -1,33 +1,61 @@
 name: release
 
-# Publishes a prebuilt tarball on every v* tag. Installing from the tarball
-# avoids depending on a build step at install time, which pnpm blocks by
-# default for dependencies.
+# Publishes a GitHub release whenever package.json has a version without one,
+# so releasing is just "bump version, merge". The tarball is prebuilt because
+# pnpm blocks dependency build scripts by default, so installing from source
+# would not run the build.
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+    paths: [package.json]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+# Never cancel a release halfway: it could leave a tag without assets.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - name: Resolve tag from package.json version
+        id: version
+        run: |
+          tag="v$(node -p 'require("./package.json").version')"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists, nothing to do."
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.version.outputs.needed == 'true'
+        uses: pnpm/action-setup@v4
+      - if: steps.version.outputs.needed == 'true'
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
-      - run: pnpm test
-      - name: Check tag matches package.json version
-        run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
-      - run: pnpm pack
+      - if: steps.version.outputs.needed == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.version.outputs.needed == 'true'
+        run: pnpm typecheck
+      - if: steps.version.outputs.needed == 'true'
+        run: pnpm test
+      - if: steps.version.outputs.needed == 'true'
+        run: pnpm pack
       # Stable asset name so /releases/latest/download/1pass2passbolt.tgz always works.
-      - run: mv 1pass2passbolt-*.tgz 1pass2passbolt.tgz
-      - run: gh release create "$GITHUB_REF_NAME" 1pass2passbolt.tgz --generate-notes
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - if: steps.version.outputs.needed == 'true'
+        run: mv 1pass2passbolt-*.tgz 1pass2passbolt.tgz
+      # --target pins the new tag to the commit that was tested.
+      - if: steps.version.outputs.needed == 'true'
+        run: >
+          gh release create "${{ steps.version.outputs.tag }}" 1pass2passbolt.tgz
+          --target "$GITHUB_SHA" --generate-notes

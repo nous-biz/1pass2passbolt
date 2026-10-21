@@ -92,7 +92,7 @@ pnpm build             # emits dist/
 
 Layout: `src/domain` holds the pure mapping and planning rules, `src/app` the use cases and the ports they depend on, `src/adapters` the `op`, `passbolt` and filesystem implementations, and `src/cli.ts` the commander wiring.
 
-To release, bump `version` in `package.json`, merge, then push a matching `vX.Y.Z` tag. The release workflow publishes `1pass2passbolt.tgz`.
+To release, bump `version` in `package.json` and merge to `main`. The release workflow creates the `vX.Y.Z` tag and publishes `1pass2passbolt.tgz`. It skips versions that already have a release, and can also be run manually from the Actions tab.
 
 ## License
 
