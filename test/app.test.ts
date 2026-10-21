@@ -132,8 +132,8 @@ describe('compareResource', () => {
     assert.ok(plan);
     const resource = {
       name: 'A', password: 'p',
-      metadata: { custom_fields: [{ type: 'password', metadata_key: 'API key' }, { type: 'text', metadata_key: 'note', metadata_value: 'changed' }] },
-      secret: { custom_fields: [{ secret_value: 'k' }, {}] },
+      metadata: { custom_fields: [{ type: 'password', metadata_key: 'API key' }, { type: 'text', metadata_key: 'note' }] },
+      secret: { custom_fields: [{ secret_value: 'k' }, { secret_value: 'changed' }] },
     };
     assert.deepEqual(compareResource(plan, resource), { mismatches: ['note'], relabeled: [] });
   });
@@ -147,8 +147,8 @@ describe('compareResource', () => {
     assert.ok(plan);
     const resource = {
       name: 'A',
-      metadata: { custom_fields: [{ type: 'uri', metadata_key: 'renamed', metadata_value: 'n' }] },
-      secret: { totp: { secret_key: 'S', algorithm: 'SHA1', digits: 8, period: 30 } },
+      metadata: { custom_fields: [{ type: 'uri', metadata_key: 'renamed' }] },
+      secret: { totp: { secret_key: 'S', algorithm: 'SHA1', digits: 8, period: 30 }, custom_fields: [{ secret_value: 'n' }] },
     };
     assert.deepEqual(compareResource(plan, resource), {
       mismatches: ['totp digits', 'note (type uri, expected text)'],
