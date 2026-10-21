@@ -46,16 +46,21 @@ describe('planResource', () => {
 });
 
 describe('toCustomFields', () => {
-  it('pairs metadata and secret by id and sets each value on only one side', () => {
+  it('pairs metadata and secret by id, keeping every value on the secret side', () => {
     let n = 0;
-    const { metadata, secret } = toCustomFields([extra, { label: 'note', value: 'hi', kind: 'text' }], () => `id${(n += 1)}`);
+    const { metadata, secret } = toCustomFields(
+      [extra, { label: 'note', value: 'hi', kind: 'text' }, { label: 'site', value: 'https://x', kind: 'uri' }],
+      () => `id${(n += 1)}`,
+    );
     assert.deepEqual(metadata, [
       { id: 'id1', type: 'password', metadata_key: 'Dev Password' },
-      { id: 'id2', type: 'text', metadata_key: 'note', metadata_value: 'hi' },
+      { id: 'id2', type: 'text', metadata_key: 'note' },
+      { id: 'id3', type: 'uri', metadata_key: 'site' },
     ]);
     assert.deepEqual(secret, [
       { id: 'id1', type: 'password', secret_value: 'd' },
-      { id: 'id2', type: 'text', secret_value: null },
+      { id: 'id2', type: 'text', secret_value: 'hi' },
+      { id: 'id3', type: 'uri', secret_value: 'https://x' },
     ]);
   });
 });

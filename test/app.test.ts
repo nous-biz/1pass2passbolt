@@ -132,10 +132,24 @@ describe('compareResource', () => {
     assert.ok(plan);
     const resource = {
       name: 'A', password: 'p',
-      metadata: { custom_fields: [{ type: 'password', metadata_key: 'API key' }, { type: 'text', metadata_key: 'note', metadata_value: 'changed' }] },
-      secret: { custom_fields: [{ secret_value: 'k' }, {}] },
+      metadata: { custom_fields: [{ type: 'password', metadata_key: 'API key' }, { type: 'text', metadata_key: 'note' }] },
+      secret: { custom_fields: [{ secret_value: 'k' }, { secret_value: 'changed' }] },
     };
     assert.deepEqual(compareResource(plan, resource), { mismatches: ['note'], relabeled: [] });
+  });
+
+  it('flags the legacy shape that keeps the value in metadata and a null secret_value', () => {
+    const plan = planResource({
+      vault: 'V', op_id: 'a', title: 'A', category: 'LOGIN', uri: null, totp: null, has_content: true,
+      fields: [{ label: 'note', value: 'n', kind: 'text' }],
+    });
+    assert.ok(plan);
+    const legacy = {
+      name: 'A',
+      metadata: { custom_fields: [{ type: 'text', metadata_key: 'note', metadata_value: 'n' }] },
+      secret: { custom_fields: [{ secret_value: null }] },
+    };
+    assert.deepEqual(compareResource(plan, legacy), { mismatches: ['note'], relabeled: [] });
   });
 
   it('reports renamed labels, wrong types and changed TOTP parameters', () => {
@@ -147,8 +161,8 @@ describe('compareResource', () => {
     assert.ok(plan);
     const resource = {
       name: 'A',
-      metadata: { custom_fields: [{ type: 'uri', metadata_key: 'renamed', metadata_value: 'n' }] },
-      secret: { totp: { secret_key: 'S', algorithm: 'SHA1', digits: 8, period: 30 } },
+      metadata: { custom_fields: [{ type: 'uri', metadata_key: 'renamed' }] },
+      secret: { totp: { secret_key: 'S', algorithm: 'SHA1', digits: 8, period: 30 }, custom_fields: [{ secret_value: 'n' }] },
     };
     assert.deepEqual(compareResource(plan, resource), {
       mismatches: ['totp digits', 'note (type uri, expected text)'],

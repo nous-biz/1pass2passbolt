@@ -63,29 +63,26 @@ export function planResource(item: NormalizedItem): ResourcePlan | null {
 
 export interface CustomFields {
   metadata: Record<string, string>[];
-  secret: Record<string, string | null>[];
+  secret: Record<string, string>[];
 }
+
+export const customFieldType = (field: Field) => (field.kind === 'password' ? 'password' : field.kind === 'uri' ? 'uri' : 'text');
 
 /**
  * Builds the id-paired metadata/secret arrays of the v5 custom_fields schema.
- * Sensitive values live only on the encrypted secret side. A value is set on
- * exactly one side: the web client rejects a field whose metadata_value and
- * secret_value are both non-null (even ""), while go-passbolt requires the
- * secret_value key to exist, so the unused side is null.
+ * Every value lives on the encrypted secret side, with only the label in the
+ * metadata: that is how the web client stores its own fields, and its editor
+ * reads secret_value.length unguarded, so a null or missing secret_value
+ * crashes the "Custom fields" panel. A value on both sides is rejected too.
  */
 export function toCustomFields(fields: Field[], newId: () => string): CustomFields {
   const metadata: CustomFields['metadata'] = [];
   const secret: CustomFields['secret'] = [];
   for (const field of fields) {
     const id = newId();
-    if (field.kind === 'password') {
-      metadata.push({ id, type: 'password', metadata_key: field.label });
-      secret.push({ id, type: 'password', secret_value: field.value });
-    } else {
-      const type = field.kind === 'uri' ? 'uri' : 'text';
-      metadata.push({ id, type, metadata_key: field.label, metadata_value: field.value });
-      secret.push({ id, type, secret_value: null });
-    }
+    const type = customFieldType(field);
+    metadata.push({ id, type, metadata_key: field.label });
+    secret.push({ id, type, secret_value: field.value });
   }
   return { metadata, secret };
 }

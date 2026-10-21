@@ -1,17 +1,10 @@
 import { normalizeItem } from '../domain/normalize.ts';
-import { planResource, TYPES } from '../domain/resource-plan.ts';
-import type { Field, ResourcePlan } from '../domain/types.ts';
+import { customFieldType, planResource, TYPES } from '../domain/resource-plan.ts';
+import type { ResourcePlan } from '../domain/types.ts';
 import type { Deps, PassboltResource } from './ports.ts';
 
 // Field-by-field fidelity check: a count alone passes even when a field was
 // imported empty or a TOTP seed is wrong.
-
-const customFieldType = (field: Field) => (field.kind === 'password' ? 'password' : field.kind === 'uri' ? 'uri' : 'text');
-
-function customFieldValue(resource: PassboltResource, index: number, field: Field): string | undefined {
-  if (field.kind === 'password') return resource.secret?.custom_fields?.[index]?.secret_value;
-  return resource.metadata?.custom_fields?.[index]?.metadata_value;
-}
 
 export interface Comparison {
   /** Fields whose value or type differs: the migration lost data. */
@@ -40,7 +33,7 @@ export function compareResource(plan: ResourcePlan, resource: PassboltResource):
     check('totp period', String(plan.totp.period), stored?.period === undefined ? undefined : String(stored.period));
   }
   plan.customFields.forEach((field, index) => {
-    check(field.label, field.value, customFieldValue(resource, index, field));
+    check(field.label, field.value, resource.secret?.custom_fields?.[index]?.secret_value);
     const stored = resource.metadata?.custom_fields?.[index];
     if (stored?.type !== customFieldType(field)) mismatches.push(`${field.label} (type ${stored?.type ?? 'missing'}, expected ${customFieldType(field)})`);
     if (stored?.metadata_key !== field.label) relabeled.push(`"${field.label}" stored as "${stored?.metadata_key ?? ''}"`);
