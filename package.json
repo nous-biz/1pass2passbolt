@@ -1,6 +1,6 @@
 {
   "name": "1pass2passbolt",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Migrate 1Password vaults into Passbolt folders: one item becomes exactly one resource, original field labels preserved.",
   "type": "module",
   "license": "MIT",
