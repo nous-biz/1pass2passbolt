@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import { resolveFolder } from '../src/app/folder.ts';
 import { exportVaults } from '../src/app/export.ts';
 import { runImport } from '../src/app/migrate.ts';
+import { resolveVaults } from '../src/app/vaults.ts';
 import { PartialResourceError, type Deps, type LedgerStatus, type OnePasswordPort, type PassboltPort } from '../src/app/ports.ts';
 import { compareResource } from '../src/app/verify.ts';
 import { planResource } from '../src/domain/resource-plan.ts';
@@ -111,11 +112,43 @@ describe('exportVaults', () => {
     );
   });
 
+  it('exports every vault of the account with all', async () => {
+    const exported: string[] = [];
+    const deps = depsWith(onePassword({}));
+    deps.state.writeVaultItems = async (vault) => { exported.push(vault); return ''; };
+    await exportVaults(deps, { vaults: [], all: true });
+    assert.deepEqual(exported, ['Private', 'Shared']);
+  });
+
   it('lists the available vaults when a --vault name is unknown', async () => {
     await assert.rejects(
       exportVaults(depsWith(onePassword({})), { vaults: ['Private', 'Nope'], all: false }),
       /vault\(s\) "Nope" not found[\s\S]*available vaults:\n {2}- Private\n {2}- Shared/,
     );
+  });
+});
+
+describe('resolveVaults', () => {
+  const onePassword = (vaults: { id: string; name: string }[]): OnePasswordPort => ({
+    version: async () => '2',
+    listAccounts: async () => [],
+    listVaults: async () => vaults,
+    listItems: async () => [],
+    getItem: async () => opItem('a', 'A'),
+  });
+  const two = [{ id: 'v1', name: 'Private' }, { id: 'v2', name: 'Shared' }];
+
+  it('returns every vault with all, the named ones otherwise', async () => {
+    assert.deepEqual((await resolveVaults(onePassword(two), { names: [], all: true })).map((v) => v.name), ['Private', 'Shared']);
+    assert.deepEqual((await resolveVaults(onePassword(two), { names: ['Shared'], all: false })).map((v) => v.name), ['Shared']);
+  });
+
+  it('asks for a vault when none is selected', async () => {
+    await assert.rejects(resolveVaults(onePassword(two), { names: [], all: false }), /--vault <name> .* --all-vaults/);
+  });
+
+  it('refuses all when the account has no readable vaults', async () => {
+    await assert.rejects(resolveVaults(onePassword([]), { names: [], all: true }), /no readable vaults/);
   });
 });
 

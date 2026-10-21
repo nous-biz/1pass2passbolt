@@ -43,6 +43,15 @@ pnpm add -g https://github.com/nous-biz/1pass2passbolt/releases/latest/download/
 1pass2passbolt clean
 ```
 
+To migrate a whole account in one go, replace `-v` with `--all-vaults` (works on `export`, `plan`, `import` and `verify`); `-v` is also repeatable. Each vault goes to a Passbolt folder named after it, so `-f/--folder` and `--folder-id` are only accepted with a single vault. A vault that fails is reported and the others still run; the exit code is non-zero.
+
+```bash
+1pass2passbolt -a example.1password.com export --all-vaults
+1pass2passbolt -a example.1password.com plan --all-vaults
+1pass2passbolt -a example.1password.com import --all-vaults   # asks once per vault; -y to skip
+1pass2passbolt -a example.1password.com verify --all-vaults
+```
+
 `-f/--folder` defaults to the vault name. Folder names must match exactly. If several folders share the name, or only a case-insensitive match exists, the command stops and asks you to pass `--folder-id`. It never guesses and never creates a look-alike folder.
 
 Global options: `-s/--state-dir <dir>` (default `./.1pass2passbolt`) and `-a/--account <address>`. Exports are stored per account, so pass the same `-a` to `export`, `plan`, `import` and `verify`.
