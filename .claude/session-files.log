@@ -1,6 +1,0 @@
-README.md
-src/app/ports.ts
-src/app/verify.ts
-src/domain/resource-plan.ts
-test/app.test.ts
-test/resource-plan.test.ts
