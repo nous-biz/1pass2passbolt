@@ -70,7 +70,7 @@ Global options: `-s/--state-dir <dir>` (default `./.1pass2passbolt`) and `-a/--a
 | string, address, email, phone, date, menu... | `text` custom field |
 | any other or future field type | `text` custom field (never dropped) |
 
-Every custom field value, whatever its type, is stored on the encrypted secret side; only the label stays in the clear metadata. This is how the Passbolt web client stores its own custom fields, and its editor fails on values kept in the metadata.
+Every custom field value, whatever its type, is stored on the encrypted secret side; only the label stays in the clear metadata. This is how the Passbolt web client stores its own custom fields, and its editor crashes on a field whose secret value is missing.
 
 An item with no secret at all and no TOTP becomes a `v5-custom-fields` resource. A lone API key or SSH key therefore lands in the native password slot, where it can be copied like any password. With `v5-totp-standalone`, which has no username slot, the username is kept as a custom field.
 

@@ -20,7 +20,7 @@ export interface PassboltResource {
   secret?: {
     password?: string;
     totp?: { secret_key?: string; algorithm?: string; digits?: number; period?: number };
-    custom_fields?: { secret_value?: string }[];
+    custom_fields?: { secret_value?: string | null }[];
   };
 }
 

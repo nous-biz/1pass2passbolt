@@ -138,6 +138,20 @@ describe('compareResource', () => {
     assert.deepEqual(compareResource(plan, resource), { mismatches: ['note'], relabeled: [] });
   });
 
+  it('flags the legacy shape that keeps the value in metadata and a null secret_value', () => {
+    const plan = planResource({
+      vault: 'V', op_id: 'a', title: 'A', category: 'LOGIN', uri: null, totp: null, has_content: true,
+      fields: [{ label: 'note', value: 'n', kind: 'text' }],
+    });
+    assert.ok(plan);
+    const legacy = {
+      name: 'A',
+      metadata: { custom_fields: [{ type: 'text', metadata_key: 'note', metadata_value: 'n' }] },
+      secret: { custom_fields: [{ secret_value: null }] },
+    };
+    assert.deepEqual(compareResource(plan, legacy), { mismatches: ['note'], relabeled: [] });
+  });
+
   it('reports renamed labels, wrong types and changed TOTP parameters', () => {
     const plan = planResource({
       vault: 'V', op_id: 'a', title: 'A', category: 'LOGIN', uri: null, has_content: true,
