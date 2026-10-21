@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
-import { Command, InvalidArgumentError, Option } from 'commander';
+import { Command, InvalidArgumentError } from 'commander';
 import { createOnePassword } from './adapters/onepassword.ts';
 import { createPassbolt } from './adapters/passbolt.ts';
 import { createStateStore } from './adapters/state.ts';
@@ -8,6 +8,7 @@ import { runDoctor } from './app/doctor.ts';
 import { exportVaults } from './app/export.ts';
 import { planMigration, runImport, type MigrationPlan } from './app/migrate.ts';
 import type { Deps, Logger } from './app/ports.ts';
+import { resolveVaults } from './app/vaults.ts';
 import { verifyMigration } from './app/verify.ts';
 import { BUCKETS } from './domain/migration-plan.ts';
 
@@ -55,7 +56,8 @@ interface GlobalOptions {
 }
 
 interface CommandOptions extends GlobalOptions {
-  vault: string;
+  vault: string[];
+  allVaults?: boolean;
   folder?: string;
   folderId?: string;
   verbose?: boolean;
@@ -73,7 +75,7 @@ function dependencies(opts: GlobalOptions): Deps {
   };
 }
 
-const folderSelector = (opts: CommandOptions) => ({ folderName: opts.folder ?? opts.vault, folderId: opts.folderId });
+const folderSelector = (opts: CommandOptions, vault: string) => ({ folderName: opts.folder ?? vault, folderId: opts.folderId });
 
 function printPlan({ folder, entries, counts }: MigrationPlan, verbose = false) {
   log.info(`target folder: "${folder.name}"${folder.id ? '' : ' (will be created)'}`);
@@ -89,13 +91,33 @@ function printPlan({ folder, entries, counts }: MigrationPlan, verbose = false) 
   }
 }
 
-const vaultOption = () => new Option('-v, --vault <name>', '1Password vault name (exact)').makeOptionMandatory();
+function withVaultOptions(cmd: Command): Command {
+  return cmd
+    .option('-v, --vault <name>', '1Password vault name (exact, repeatable)', collect, [])
+    .option('--all-vaults', 'every vault of the account');
+}
 
 function withFolderOptions(cmd: Command): Command {
-  return cmd
-    .addOption(vaultOption())
+  return withVaultOptions(cmd)
     .option('-f, --folder <name>', 'target Passbolt folder name (exact; defaults to the vault name)')
     .option('--folder-id <id>', 'target Passbolt folder id (overrides --folder)');
+}
+
+// A failing vault doesn't stop the others: the ledger makes a rerun resume where it left off.
+async function forEachVault(deps: Deps, opts: CommandOptions, run: (vault: string) => Promise<void>) {
+  const vaults = await resolveVaults(deps.onePassword, { names: opts.vault, all: Boolean(opts.allVaults), account: opts.account });
+  if (vaults.length > 1 && (opts.folder || opts.folderId)) {
+    throw new Error('--folder and --folder-id name a single folder: use them with one vault, or omit them to get one folder per vault');
+  }
+  for (const { name } of vaults) {
+    if (vaults.length > 1) log.info(`\n== vault "${name}" ==`);
+    try {
+      await run(name);
+    } catch (error) {
+      log.error(`error: ${(error as Error).message}`);
+      process.exitCode = 1;
+    }
+  }
 }
 
 const action = <T extends GlobalOptions = CommandOptions>(fn: (deps: Deps, opts: T) => Promise<void>) => async (...args: unknown[]) => {
@@ -119,42 +141,40 @@ export function buildProgram(): Command {
       if (checks.some((c) => c.status === 'fail')) process.exitCode = 1;
     }));
 
-  program.command('export')
+  withVaultOptions(program.command('export'))
     .description('export full item JSON of vault(s) into the state dir (plaintext secrets, mode 0600)')
-    .option('-v, --vault <name>', 'vault name (exact, repeatable)', collect, [])
-    .option('--all', 'export every vault of the account')
-    .action(action<GlobalOptions & { vault: string[]; all?: boolean }>(async (deps, opts) => {
-      await exportVaults(deps, { vaults: opts.vault, all: Boolean(opts.all), account: opts.account });
+    .option('--all', 'alias of --all-vaults')
+    .action(action(async (deps, opts) => {
+      await exportVaults(deps, { vaults: opts.vault, all: Boolean(opts.allVaults || opts.all), account: opts.account });
     }));
 
   withFolderOptions(program.command('plan'))
     .description('dry run: show what import would create, skip, or leave for manual review')
     .option('--verbose', 'list the item titles of every bucket')
-    .action(action(async (deps, opts) => {
-      printPlan(await planMigration(deps, { vault: opts.vault, ...folderSelector(opts) }), opts.verbose);
-    }));
+    .action(action((deps, opts) => forEachVault(deps, opts, async (vault) => {
+      printPlan(await planMigration(deps, { vault, ...folderSelector(opts, vault) }), opts.verbose);
+    })));
 
   withFolderOptions(program.command('import'))
     .description('create the missing resources in Passbolt (resumable, never duplicates a ledger entry)')
     .option('-y, --yes', 'do not ask for confirmation')
-    .action(action(async (deps, opts) => {
+    .action(action((deps, opts) => forEachVault(deps, opts, async (vault) => {
       const confirm = opts.yes ? async () => true : confirmOnTty;
-      const result = await runImport(deps, { vault: opts.vault, ...folderSelector(opts), confirm });
+      const result = await runImport(deps, { vault, ...folderSelector(opts, vault), confirm });
       log.info(`created ${result.created}, failed ${result.failed}; ambiguous ${result.counts.ambiguous}, manual review ${result.counts.manual}`);
       if (result.failed > 0) process.exitCode = 1;
-    }));
+    })));
 
-  program.command('verify')
+  withVaultOptions(program.command('verify'))
     .description('compare migrated resources with the export, field by field')
-    .addOption(vaultOption())
-    .option('-n, --sample <size>', 'number of random items to check (default 15)', positiveInt)
+    .option('-n, --sample <size>', 'number of random items to check per vault (default 15)', positiveInt)
     .option('--all', 'check every migrated item')
-    .action(action(async (deps, opts) => {
+    .action(action((deps, opts) => forEachVault(deps, opts, async (vault) => {
       const size = opts.all ? Infinity : (opts.sample ?? 15);
-      const { checked, failures, relabeled } = await verifyMigration(deps, { vault: opts.vault, size });
+      const { checked, failures, relabeled } = await verifyMigration(deps, { vault, size });
       log.info(`\nchecked ${checked}, mismatches ${failures}, label-only differences ${relabeled}`);
       if (failures > 0) process.exitCode = 1;
-    }));
+    })));
 
   program.command('clean')
     .description('delete the state dir (exports and ledger)')
